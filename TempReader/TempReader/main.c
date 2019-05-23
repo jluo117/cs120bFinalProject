@@ -4,7 +4,7 @@
  * Created: 5/23/2019 10:00:59 AM
  * Author : ucrcse
  */ 
-
+#define F_CPU 100000UL
 #include <avr/io.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -30,7 +30,7 @@ uint8_t Receive_data()			/* receive data */
 	for (int q=0; q<8; q++)
 	{
 		while((PINA & (1<<DHT11_PIN)) == 0);  /* check received bit 0 or 1 */
-		_delay_us(30);
+		_delay_ms(30);
 		if(PINA & (1<<DHT11_PIN))/* if high pulse is greater than 30ms */
 		c = (c<<1)|(0x01);	/* then its logic HIGH */
 		else			/* otherwise its logic LOW */
