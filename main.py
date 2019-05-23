@@ -11,7 +11,8 @@ def gen_graph(toPlot):
     plt.savefig('test.png')
     plt.close()
     im = Image.open("test.png")
-    im.save("test.png",dpi = (128,128))
+    im = im.resize((128,128))
+    im.save("test.png",dpi = (300,300))
 while True:
     myAry = []
     for _ in range(10):
