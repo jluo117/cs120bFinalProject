@@ -4,7 +4,7 @@
  * Created: 5/23/2019 10:00:59 AM
  * Author : ucrcse
  */ 
-#define F_CPU 100000UL
+#define F_CPU 8000000
 #include <avr/io.h>
 #include <stdlib.h>
 #include <stdio.h>
