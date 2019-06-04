@@ -1,12 +1,24 @@
+/* Nokia 5110 LCD AVR Library
+ *
+ * Copyright (C) 2015 Sergey Denisov.
+ * Written by Sergey Denisov aka LittleBuster (DenisovS21@gmail.com)
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public Licence
+ * as published by the Free Software Foundation; either version 3
+ * of the Licence, or (at your option) any later version.
+ *
+ * Original library written by SkewPL, http://skew.tk
+ */
+
 #include "nokia5110.h"
 
 #include <avr/pgmspace.h>
 #include <avr/io.h>
 #include <util/delay.h>
-#include "nokia5110_font.h"
+#include "nokia5110_chars.h"
 
 
-#define LCD_CONTRAST 0x40
 static struct {
     /* screen byte massive */
     uint8_t screen[504];
