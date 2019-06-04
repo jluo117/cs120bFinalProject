@@ -4,7 +4,8 @@
  * Created: 5/23/2019 10:00:59 AM
  * Author : ucrcse
  */ 
-//code source  :https://github.com/Andre-Castro/EE120BSpr17/tree/master/acast050_FinalProject
+//code source  :https://github.com/Andre-Castro/EE120BSpr17/tree/master/acast050_FinalProject (refrence to get started)
+//Nokia Source https://github.com/LittleBuster/avr-nokia5110 (Nokia libary)
 
 #include <avr/io.h>
 #include <stdlib.h>
@@ -13,11 +14,9 @@
 
 #include "nokia5110.c"
 
-
-#define DHT11_PIN 6
 volatile int num = 100;
 volatile unsigned char TimerFlag = 0; // TimerISR() sets this to 1. C programmer should clear to 0.
-
+volatile int timePast = 0;
 // Internal variables for mapping AVR's ISR to our cleaner TimerISR model.
 unsigned long _avr_timer_M = 1; // Start count from here, down to 0. Default 1 ms.
 unsigned long _avr_timer_cntcurr = 0; // Current internal count of 1ms ticks
@@ -29,7 +28,7 @@ unsigned long _avr_timer_cntcurr = 0; // Current internal count of 1ms ticks
  */
 int targetNum;
 enum joyStick {down,up,left,right,still} Joystate;
-enum gameState{inGame,Win} state;
+enum gameState{inGame,Win,init,Lose} state;
 uint8_t c=0,I_RH,D_RH,I_Temp,D_Temp,CheckSum;
 
 void A2D_init(){
@@ -86,7 +85,7 @@ void TimerOn() {
 
 	// AVR output compare register OCR1A.
 	OCR1A = 125;    // Timer interrupt will be generated when TCNT1==OCR1A
-	// We want a 1 ms tick. 0.001 s * 125,000 ticks/s = 125
+	// We want a 1 ms tick. 0.001  s * 125,000 ticks/s = 125
 	// So when TCNT1 register equals 125,
 	// 1 ms has passed. Thus, we compare to 125.
 	// AVR timer interrupt mask register
@@ -114,7 +113,10 @@ void writeValues(int myValue){
 	char snum[5];
 	itoa(myValue, snum, 10);
 	nokia_lcd_clear();
+    nokia_lcd_write_string("Bomb Planted",1);
+    nokia_lcd_set_cursor(0, 10);
 	nokia_lcd_write_string(snum,3);
+    
 	nokia_lcd_render();
 }
 
@@ -130,13 +132,67 @@ void updateNum(){
 		break;
 	}
 }
-
+void tick(){
+	char unsigned D = 0;
+	D = PIND;
+	D = D & 0x01;
+    switch (state) {
+        case inGame:
+            if (targetNum == num){
+                state = Win;
+            }
+            if (timePast >= 175){
+                state = Lose;
+            }
+            break;
+        case Win:
+        	if (D == 1){
+        		state = init;
+        	}
+            break;
+            //return to init state
+        case Lose:
+        	if (D== 1){
+        		state = init;
+        	}
+            break;
+        case init:
+            state = inGame;
+            break;
+            // return to init state
+        default:
+            break;
+    }
+    switch (state){
+        case inGame:
+            joystickState();
+            updateNum();
+            writeValues(num);
+            timePast++;
+            break;
+        case Win:
+            nokia_lcd_clear();
+            nokia_lcd_write_string("Bomb Defused",1);
+            nokia_lcd_set_cursor(0, 10);
+            nokia_lcd_write_string("CT Wins", 3);
+            break;
+        case Lose:
+            nokia_lcd_clear();
+            nokia_lcd_write_string("Target Destroy",1);
+            nokia_lcd_set_cursor(0, 10);
+            nokia_lcd_write_string("T Wins", 3);
+            break;
+        case init:
+            timePast = 0;
+            num = 100;
+    }
+    
+}
 int main(void)
 {
-	int timePast = 0;
 	ADCInit();
 	targetNum = rand() % (150 + 1 - 0) + 0;
-	TimerSet(10);
+	TimerSet(250);
 	DDRA = 0x00; PORTA = 0xFF; //Input
 	DDRB = 0x00; PORTB = 0xFF; //Ouptut
 	DDRC = 0xFF; PORTC = 0x00; 
@@ -145,26 +201,13 @@ int main(void)
     nokia_lcd_clear();
     nokia_lcd_write_string("IT'S WORKING!",1);
     nokia_lcd_set_cursor(0, 10);
-    //nokia_lcd_write_string("Nice!", 3);
+    nokia_lcd_write_string("Nice!", 3);
 	writeValues(100);
 	state = inGame;
     /* Replace with your application code */
     while (1) 
     {
-		switch (state){
-			case inGame:
-			joystickState();
-			updateNum();
-			writeValues(num);
-			timePast++;
-			if (targetNum == num){
-				state = Win;
-			}
-			break;
-		case Win:
-		writeValues(timePast);
-		break;
-		}
+        tick();
 		/* store next eight bit in CheckSum */
 		//PORTB = I_Temp;
     }
