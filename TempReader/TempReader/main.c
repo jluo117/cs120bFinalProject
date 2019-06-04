@@ -5,19 +5,17 @@
  * Author : ucrcse
  */ 
 //code source  :https://github.com/Andre-Castro/EE120BSpr17/tree/master/acast050_FinalProject
-#define F_CPU 8000000
+
 #include <avr/io.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <util/delay.h>
 #include <string.h>
 
 #include "nokia5110.c"
 
 
 #define DHT11_PIN 6
-
-
+volatile int num = 100;
 volatile unsigned char TimerFlag = 0; // TimerISR() sets this to 1. C programmer should clear to 0.
 
 // Internal variables for mapping AVR's ISR to our cleaner TimerISR model.
@@ -29,60 +27,44 @@ unsigned long _avr_timer_cntcurr = 0; // Current internal count of 1ms ticks
  * @bytes: data
  * @is_data: transfer mode: 1 - data; 0 - command;
  */
-unsigned float y_axies = ADCSRA(1);
-unsigned float x_axis = ADCSRA(0);
+int targetNum;
 enum joyStick {down,up,left,right,still} Joystate;
+enum gameState{inGame,Win} state;
 uint8_t c=0,I_RH,D_RH,I_Temp,D_Temp,CheckSum;
+
 void A2D_init(){
+	
 	ADCSRA |= (1 >> ADEN) | (1 << ADSC) | (1 << ADATE);
 }
+void ADCInit(){
+	ADMUX = (1 << REFS0);
+	ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1<< ADPS1) | (1 << ADPS0);
+}
+uint16_t adc_read(uint8_t ch){
+	ch &= 0b00000111;
+	ADMUX = (ADMUX & 0xF8)| ch;
+	ADCSRA |= (1 <<ADSC);
+	while(ADCSRA & (1 << ADSC));
+	return (ADC);
+}
+
 void joystickState(){
-	if(y_axies >= 1023 && x_axis <= 1023){
+	int16_t y_axies = adc_read(1);
+	int16_t x_axis = adc_read(0);
+	if(y_axies >= 1023){
 		Joystate = down;
 	}
-	else if (y_axies <= 25 && x_axis <= 1023){
+	else if (y_axies <= 300){
 		Joystate = up;
 	}
-	else if (x_axis >= 1023 && y_axies <= 1023){
-		Joystate = left;
-	}
-	else if (x_axis >= 1023 && y_axies <= 1023){
-		Joystate = right;
-	}
+	
+
 	else{
 		Joystate = still;
 	}
 }
-void Request()				/* Microcontroller send start pulse/request */
-{
-	DDRD |= (1<<DHT11_PIN);
-	PORTD &= ~(1<<DHT11_PIN);	/* set to low pin */
-	_delay_ms(20);			/* wait for 20ms */
-	PORTD |= (1<<DHT11_PIN);	/* set to high pin */
-}
 
-void Response()				/* receive response from DHT11 */
-{
-	DDRD &= ~(1<<DHT11_PIN);
-	while(PIND & (1<<DHT11_PIN));
-	while((PIND & (1<<DHT11_PIN))==0);
-	while(PIND & (1<<DHT11_PIN));
-}
 
-uint8_t Receive_data()			/* receive data */
-{
-	for (int q=0; q<8; q++)
-	{
-		while((PIND & (1<<DHT11_PIN)) == 0);  /* check received bit 0 or 1 */
-		_delay_us(30);
-		if(PIND & (1<<DHT11_PIN))/* if high pulse is greater than 30ms */
-		c = (c<<1)|(0x01);	/* then its logic HIGH */
-		else			/* otherwise its logic LOW */
-		c = (c<<1);
-		while(PIND & (1<<DHT11_PIN));
-	}
-	return c;
-}
 void TimerSet(unsigned long M) {
 	_avr_timer_M = M;
 	_avr_timer_cntcurr = _avr_timer_M;
@@ -94,7 +76,40 @@ void TimerOff() {
 void TimerISR() {
 	TimerFlag = 1;
 }
-const unsigned short PERIOD = 10;
+void TimerOn() {
+	// AVR timer/counter controller register TCCR1
+	TCCR1B = 0x0B;// bit3 = 0: CTC mode (clear timer on compare)
+	// bit2bit1bit0=011: pre-scaler /64
+	// 00001011: 0x0B
+	// SO, 8 MHz clock or 8,000,000 /64 = 125,000 ticks/s
+	// Thus, TCNT1 register will count at 125,000 ticks/s
+
+	// AVR output compare register OCR1A.
+	OCR1A = 125;    // Timer interrupt will be generated when TCNT1==OCR1A
+	// We want a 1 ms tick. 0.001 s * 125,000 ticks/s = 125
+	// So when TCNT1 register equals 125,
+	// 1 ms has passed. Thus, we compare to 125.
+	// AVR timer interrupt mask register
+	TIMSK1 = 0x02; // bit1: OCIE1A -- enables compare match interrupt
+
+	//Initialize avr counter
+	TCNT1=0;
+
+	_avr_timer_cntcurr = _avr_timer_M;
+	// TimerISR will be called every _avr_timer_cntcurr milliseconds
+
+	//Enable global interrupts
+	SREG |= 0x80; // 0x80: 1000000
+}
+ISR(TIMER1_COMPA_vect) {
+	// CPU automatically calls when TCNT1 == OCR1 (every 1 ms per TimerOn settings)
+	_avr_timer_cntcurr--; // Count down to 0 rather than up to TOP
+	if (_avr_timer_cntcurr == 0) { // results in a more efficient compare
+		TimerISR(); // Call the ISR that the user uses
+		_avr_timer_cntcurr = _avr_timer_M;
+	}
+}
+const unsigned short PERIOD = 250;
 void writeValues(int myValue){
 	char snum[5];
 	itoa(myValue, snum, 10);
@@ -102,16 +117,7 @@ void writeValues(int myValue){
 	nokia_lcd_write_string(snum,3);
 	nokia_lcd_render();
 }
-int getTemp(){
-	Request();		/* send start pulse */
-	Response();		/* receive response */
-	I_RH=Receive_data();	/* store first eight bit in I_RH */
-	D_RH=Receive_data();	/* store next eight bit in D_RH */
-	I_Temp=Receive_data();	/* store next eight bit in I_Temp */
-	D_Temp=Receive_data();
-	return I_Temp	;/* store next eight bit in D_Temp */
-	
-}
+
 void updateNum(){
 	switch(Joystate){
 		case up:
@@ -124,29 +130,41 @@ void updateNum(){
 		break;
 	}
 }
-int num = 100;
+
 int main(void)
 {
-	TimerSet(PERIOD);
+	int timePast = 0;
+	ADCInit();
+	targetNum = rand() % (150 + 1 - 0) + 0;
+	TimerSet(10);
 	DDRA = 0x00; PORTA = 0xFF; //Input
 	DDRB = 0x00; PORTB = 0xFF; //Ouptut
 	DDRC = 0xFF; PORTC = 0x00; 
-	DDRD = 0xFF; PORTD = 0x00;
+	DDRD = 0x00; PORTD = 0xFF;
 	nokia_lcd_init();
     nokia_lcd_clear();
     nokia_lcd_write_string("IT'S WORKING!",1);
     nokia_lcd_set_cursor(0, 10);
     //nokia_lcd_write_string("Nice!", 3);
 	writeValues(100);
-	
+	state = inGame;
     /* Replace with your application code */
     while (1) 
     {
-		
-		joystickState();
-		updateNum();
-		writeValues(num);
-		
+		switch (state){
+			case inGame:
+			joystickState();
+			updateNum();
+			writeValues(num);
+			timePast++;
+			if (targetNum == num){
+				state = Win;
+			}
+			break;
+		case Win:
+		writeValues(timePast);
+		break;
+		}
 		/* store next eight bit in CheckSum */
 		//PORTB = I_Temp;
     }
