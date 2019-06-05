@@ -24,6 +24,7 @@ unsigned long _avr_timer_cntcurr = 0; // Current internal count of 1ms ticks
 int curNum = 0;
 int timePast;
 int totalTime;
+int totalWins;
 /**
  * Sending data to LCD
  * @bytes: data
@@ -37,7 +38,7 @@ int targetNum[3];
  */
 
 enum joyStick {down,up,left,right,still} Joystate;
-enum gameState{inGame,Win,Lose} state;
+enum gameState{inGame,Win,Lose,Score} state;
 uint8_t c=0,I_RH,D_RH,I_Temp,D_Temp,CheckSum;
 
 void A2D_init(){
@@ -127,7 +128,15 @@ void writeValues(int myValue){
 	nokia_lcd_write_string(snum,3);
 	nokia_lcd_render();
 }
-
+void WinValues(int myValue){
+	char snum[5];
+	itoa(myValue, snum, 10);
+	nokia_lcd_clear();
+	nokia_lcd_write_string("Wins",1);
+	nokia_lcd_set_cursor(0, 10);
+	nokia_lcd_write_string(snum,3);
+	nokia_lcd_render();
+}
 void updateNum(){
 	switch(Joystate){
 		case up:
@@ -176,6 +185,7 @@ int main(void)
 	writeValues(100);
 	state = inGame;
 	char unsigned input = 0;
+	totalWins = 0;
     /* Replace with your application code */
     while (1) 
     {
@@ -187,6 +197,7 @@ int main(void)
 			writeValues(num);
 			timePast++;
 			if (curNum == 3){
+				totalWins++;
 				state = Win;
 			}
 			if (timePast >= 400){
@@ -194,32 +205,42 @@ int main(void)
 			}
 			break;
 		case Win:
+		
 		resetTime++;
-		if (Joystate != still && resetTime > 15){
-			resetGame();
-			state = inGame;
+		if (resetTime > 15){
+			state = Score;
 			continue;
 		}
+		
+		
 		nokia_lcd_clear();
 		nokia_lcd_write_string("Defused",1);
-		nokia_lcd_set_cursor(0, 10);
+		nokia_lcd_set_cursor(0,10);
 		nokia_lcd_write_string("Win", 3);
 		nokia_lcd_render();
 		
 		break;
 		case Lose:
 		resetTime++;
-		if (Joystate != still && resetTime > 15){
-			resetGame();
-			state = inGame;
+		if (resetTime > 15){
+			state = Score;
 			continue;
 		}
+		
 		nokia_lcd_clear();
 		nokia_lcd_write_string("Exploded",1);
 		nokia_lcd_set_cursor(0, 10);
 		nokia_lcd_write_string("T Win", 3);
 		nokia_lcd_render();
 		
+		break;
+	
+		case Score:
+		WinValues(totalWins);
+		if (Joystate != still){
+			resetGame();
+			state = inGame;
+		}
 		break;
 		}
 		/* store next eight bit in CheckSum */
