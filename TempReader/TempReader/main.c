@@ -185,6 +185,7 @@ void tick(){
         case init:
             timePast = 0;
             num = 100;
+			break;
     }
     
 }
