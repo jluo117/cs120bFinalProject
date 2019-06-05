@@ -17,12 +17,13 @@
 #define DHT11_PIN 6
 volatile int num = 100;
 volatile unsigned char TimerFlag = 0; // TimerISR() sets this to 1. C programmer should clear to 0.
-
+int resetTime = 75;
 // Internal variables for mapping AVR's ISR to our cleaner TimerISR model.
 unsigned long _avr_timer_M = 1; // Start count from here, down to 0. Default 1 ms.
 unsigned long _avr_timer_cntcurr = 0; // Current internal count of 1ms ticks
 int curNum = 0;
 int timePast;
+int totalTime;
 /**
  * Sending data to LCD
  * @bytes: data
@@ -146,10 +147,19 @@ void updateNum(){
 		curNum++;
 	}
 }
-
+void resetGame(){
+	resetTime = 0;
+	num = 100;
+	targetNum [0] =  rand() % (totalTime)% (150 + 1 - 0);
+	targetNum [1] = rand() % (totalTime) % (50 + 1 - 0);
+	targetNum[2] = rand() % (totalTime) % (100 + 1) + 70;
+	timePast = 0;
+	curNum = 0;
+}
 int main(void)
 {
-	
+	resetTime = 0;
+	totalTime = 0;
 	ADCInit();
 	targetNum [0] =  rand() % (150 + 1 - 0) + 0;
 	targetNum [1] = rand() % (50 + 1 - 0) + 0;
@@ -170,6 +180,7 @@ int main(void)
     /* Replace with your application code */
     while (1) 
     {
+		totalTime++;
 		switch (state){
 			case inGame:
 			joystickState();
@@ -184,6 +195,12 @@ int main(void)
 			}
 			break;
 		case Win:
+		resetTime++;
+		if (resetTime > 50){
+			resetGame();
+			state = inGame;
+			continue;
+		}
 		nokia_lcd_clear();
 		nokia_lcd_write_string("Defused",1);
 		nokia_lcd_set_cursor(0, 10);
@@ -192,6 +209,12 @@ int main(void)
 		
 		break;
 		case Lose:
+		resetTime++;
+		if (resetTime > 50){
+			resetGame();
+			state = inGame;
+			continue;
+		}
 		nokia_lcd_clear();
 		nokia_lcd_write_string("Exploded",1);
 		nokia_lcd_set_cursor(0, 10);
