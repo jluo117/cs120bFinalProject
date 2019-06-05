@@ -21,15 +21,22 @@ volatile unsigned char TimerFlag = 0; // TimerISR() sets this to 1. C programmer
 // Internal variables for mapping AVR's ISR to our cleaner TimerISR model.
 unsigned long _avr_timer_M = 1; // Start count from here, down to 0. Default 1 ms.
 unsigned long _avr_timer_cntcurr = 0; // Current internal count of 1ms ticks
-
+int curNum = 0;
+int timePast;
 /**
  * Sending data to LCD
  * @bytes: data
  * @is_data: transfer mode: 1 - data; 0 - command;
  */
-int targetNum;
+int targetNum[3];
+/**
+ * Sending data to LCD
+ * @bytes: data
+ * @is_data: transfer mode: 1 - data; 0 - command;
+ */
+
 enum joyStick {down,up,left,right,still} Joystate;
-enum gameState{inGame,Win} state;
+enum gameState{inGame,Win,Lose} state;
 uint8_t c=0,I_RH,D_RH,I_Temp,D_Temp,CheckSum;
 
 void A2D_init(){
@@ -114,6 +121,8 @@ void writeValues(int myValue){
 	char snum[5];
 	itoa(myValue, snum, 10);
 	nokia_lcd_clear();
+	nokia_lcd_write_string("Armed",1);
+	nokia_lcd_set_cursor(0, 10);
 	nokia_lcd_write_string(snum,3);
 	nokia_lcd_render();
 }
@@ -121,21 +130,31 @@ void writeValues(int myValue){
 void updateNum(){
 	switch(Joystate){
 		case up:
-			num++;
-			break;
+		num++;
+		break;
 		case down:
-			num--;
-			break;
+		num--;
+		break;
 		default:
 		break;
+	}
+	if (curNum >= 3){
+		return;
+	}
+	if (num == targetNum[curNum]){
+		num = 100;
+		curNum++;
 	}
 }
 
 int main(void)
 {
-	int timePast = 0;
+	
 	ADCInit();
-	targetNum = rand() % (150 + 1 - 0) + 0;
+	targetNum [0] =  rand() % (150 + 1 - 0) + 0;
+	targetNum [1] = rand() % (50 + 1 - 0) + 0;
+	targetNum[2] = rand() % (100 + 1);
+	timePast = 0;
 	TimerSet(10);
 	DDRA = 0x00; PORTA = 0xFF; //Input
 	DDRB = 0x00; PORTB = 0xFF; //Ouptut
@@ -157,12 +176,28 @@ int main(void)
 			updateNum();
 			writeValues(num);
 			timePast++;
-			if (targetNum == num){
+			if (curNum == 3){
 				state = Win;
+			}
+			if (timePast >= 400){
+				state = Lose;
 			}
 			break;
 		case Win:
-		writeValues(timePast);
+		nokia_lcd_clear();
+		nokia_lcd_write_string("Defused",1);
+		nokia_lcd_set_cursor(0, 10);
+		nokia_lcd_write_string("Win", 3);
+		nokia_lcd_render();
+		
+		break;
+		case Lose:
+		nokia_lcd_clear();
+		nokia_lcd_write_string("Exploded",1);
+		nokia_lcd_set_cursor(0, 10);
+		nokia_lcd_write_string("T Win", 3);
+		nokia_lcd_render();
+		
 		break;
 		}
 		/* store next eight bit in CheckSum */
