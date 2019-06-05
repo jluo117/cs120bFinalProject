@@ -116,7 +116,7 @@ void writeValues(int myValue){
 	itoa(curNum,tickLeft,10);
 	itoa(myValue, snum, 10);
 	nokia_lcd_clear();
-	nokia_lcd_write_string("Armed:");
+	nokia_lcd_write_string("Armed");
 	nokia_lcd_set_cursor(0, 10);
 	
 	nokia_lcd_write_string(snum,3);
