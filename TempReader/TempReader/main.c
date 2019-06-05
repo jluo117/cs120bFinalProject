@@ -150,9 +150,9 @@ void updateNum(){
 void resetGame(){
 	resetTime = 0;
 	num = 100;
-	targetNum [0] =  rand() % (totalTime)% (150 + 1 - 0);
-	targetNum [1] = rand() % (totalTime) % (50 + 1 - 0);
-	targetNum[2] = rand() % (totalTime) % (100 + 1) + 70;
+	targetNum [0] =  (rand() % (totalTime))% (150 + 1 - 0);
+	targetNum [1] = (rand() % (totalTime)) % (50 + 1 - 0);
+	targetNum[2] = (rand() % (totalTime)) % (100 + 1) + 70;
 	timePast = 0;
 	curNum = 0;
 }
@@ -166,10 +166,8 @@ int main(void)
 	targetNum[2] = rand() % (100 + 1);
 	timePast = 0;
 	TimerSet(10);
-	DDRA = 0x00; PORTA = 0xFF; //Input
-	DDRB = 0x00; PORTB = 0xFF; //Ouptut
-	DDRC = 0xFF; PORTC = 0x00; 
-	DDRD = 0x00; PORTD = 0xFF;
+	DDRA = 0x00; PORTA = 0xFF; //Input //Ouptut
+	DDRC = 0x00; PORTC = 0xFF; 
 	nokia_lcd_init();
     nokia_lcd_clear();
     nokia_lcd_write_string("IT'S WORKING!",1);
@@ -177,13 +175,14 @@ int main(void)
     //nokia_lcd_write_string("Nice!", 3);
 	writeValues(100);
 	state = inGame;
+	char unsigned input = 0;
     /* Replace with your application code */
     while (1) 
     {
+		joystickState();
 		totalTime++;
 		switch (state){
 			case inGame:
-			joystickState();
 			updateNum();
 			writeValues(num);
 			timePast++;
@@ -196,7 +195,7 @@ int main(void)
 			break;
 		case Win:
 		resetTime++;
-		if (resetTime > 50){
+		if (Joystate != still && resetTime > 15){
 			resetGame();
 			state = inGame;
 			continue;
@@ -210,7 +209,7 @@ int main(void)
 		break;
 		case Lose:
 		resetTime++;
-		if (resetTime > 50){
+		if (Joystate != still && resetTime > 15){
 			resetGame();
 			state = inGame;
 			continue;
