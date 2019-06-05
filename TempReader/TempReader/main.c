@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
+#include<time.h>
 #include "nokia5110.c"
 
 
@@ -21,15 +21,15 @@ volatile unsigned char TimerFlag = 0; // TimerISR() sets this to 1. C programmer
 // Internal variables for mapping AVR's ISR to our cleaner TimerISR model.
 unsigned long _avr_timer_M = 1; // Start count from here, down to 0. Default 1 ms.
 unsigned long _avr_timer_cntcurr = 0; // Current internal count of 1ms ticks
-
+int curNum = 0;
 /**
  * Sending data to LCD
  * @bytes: data
  * @is_data: transfer mode: 1 - data; 0 - command;
  */
-int targetNum;
+int targetNum[3];
 enum joyStick {down,up,left,right,still} Joystate;
-enum gameState{inGame,Win} state;
+enum gameState{inGame,Win,Lose,Done} state;
 uint8_t c=0,I_RH,D_RH,I_Temp,D_Temp,CheckSum;
 
 void A2D_init(){
@@ -63,7 +63,7 @@ void joystickState(){
 		Joystate = still;
 	}
 }
-
+int timePast = 0;
 
 void TimerSet(unsigned long M) {
 	_avr_timer_M = M;
@@ -112,9 +112,17 @@ ISR(TIMER1_COMPA_vect) {
 const unsigned short PERIOD = 250;
 void writeValues(int myValue){
 	char snum[5];
+	char tickLeft[5];
+	itoa(curNum,tickLeft,10);
 	itoa(myValue, snum, 10);
 	nokia_lcd_clear();
+	nokia_lcd_write_string("Armed:");
+	nokia_lcd_set_cursor(0, 10);
+	
 	nokia_lcd_write_string(snum,3);
+	
+	
+	
 	nokia_lcd_render();
 }
 
@@ -129,17 +137,44 @@ void updateNum(){
 		default:
 		break;
 	}
+	if (curNum >= 3){
+		return;
+	}
+	if (num == targetNum[curNum]){
+		curNum++;
+	}
+}
+
+void reset(){
+	if (state == inGame){
+		return;
+	}
+	unsigned char C = 0;
+	C = PINC;
+	C = C & 0x01;
+	if (C == 1){
+		curNum = 0;
+		targetNum [0] =  rand() % (150 + 1 - 0) + 0;
+		targetNum [1] = rand() % (50 + 1 - 0) + 0;
+		targetNum[2] = rand() % (100 + 1);
+		num = 0;
+		timePast = 0;
+		state = inGame;
+	}
 }
 
 int main(void)
 {
-	int timePast = 0;
+	
+	
 	ADCInit();
-	targetNum = rand() % (150 + 1 - 0) + 0;
+	targetNum [0] =  rand() % (150 + 1 - 0) + 0;
+	targetNum [1] = rand() % (50 + 1 - 0) + 0;
+	targetNum[2] = rand() % (100 + 1);
 	TimerSet(10);
 	DDRA = 0x00; PORTA = 0xFF; //Input
-	DDRB = 0x00; PORTB = 0xFF; //Ouptut
-	DDRC = 0xFF; PORTC = 0x00; 
+	
+	DDRC = 0x00; PORTC = 0xFF; 
 	DDRD = 0x00; PORTD = 0xFF;
 	nokia_lcd_init();
     nokia_lcd_clear();
@@ -151,22 +186,41 @@ int main(void)
     /* Replace with your application code */
     while (1) 
     {
+		//reset();
 		switch (state){
 			case inGame:
 			joystickState();
 			updateNum();
 			writeValues(num);
 			timePast++;
-			if (targetNum == num){
+			if (curNum == 3){
 				state = Win;
+			}
+			if (timePast >= 400){
+				state = Lose;
 			}
 			break;
 		case Win:
-		writeValues(timePast);
+			nokia_lcd_clear();
+			nokia_lcd_write_string("Defused",1);
+			nokia_lcd_set_cursor(0, 10);
+			nokia_lcd_write_string("Win", 3);
+			nokia_lcd_render();
+			
+			break;
+			case Lose:
+			nokia_lcd_clear();
+			nokia_lcd_write_string("Exploded",1);
+			nokia_lcd_set_cursor(0, 10);
+			nokia_lcd_write_string("T Win", 3);
+			nokia_lcd_render();
+			
 		break;
 		}
+		
 		/* store next eight bit in CheckSum */
 		//PORTB = I_Temp;
     }
+	return 0;
 }
 
