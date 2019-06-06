@@ -10,7 +10,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
+#include <avr/eeprom.h>
+#include "eeprom.c"
 #include "nokia5110.c"
 
 
@@ -24,7 +25,8 @@ unsigned long _avr_timer_cntcurr = 0; // Current internal count of 1ms ticks
 int curNum = 0;
 int timePast;
 int totalTime;
-int totalWins;
+unsigned char totalWins = 0;
+
 /**
  * Sending data to LCD
  * @bytes: data
@@ -128,7 +130,7 @@ void writeValues(int myValue){
 	nokia_lcd_write_string(snum,3);
 	nokia_lcd_render();
 }
-void WinValues(int myValue){
+void WinValues(unsigned char myValue){
 	char snum[5];
 	itoa(myValue, snum, 10);
 	nokia_lcd_clear();
@@ -157,6 +159,7 @@ void updateNum(){
 	}
 }
 void resetGame(){
+	totalTime = totalTime % 450;
 	resetTime = 0;
 	num = 100;
 	targetNum [0] =  (rand() % (totalTime))% (150 + 1 - 0);
@@ -167,6 +170,12 @@ void resetGame(){
 }
 int main(void)
 {
+	
+	
+	if (EEPROM_Read(0) > 200){
+		EEPROM_Write(0,0);
+	}
+	totalWins = EEPROM_Read(0);
 	resetTime = 0;
 	totalTime = 0;
 	ADCInit();
@@ -188,7 +197,7 @@ int main(void)
 	totalWins = 0;
     /* Replace with your application code */
     while (1) 
-    {
+    {EEPROM_Write(0,totalWins);
 		joystickState();
 		totalTime++;
 		switch (state){
@@ -198,6 +207,7 @@ int main(void)
 			timePast++;
 			if (curNum == 3){
 				totalWins++;
+				
 				state = Win;
 			}
 			if (timePast >= 400){
@@ -208,6 +218,7 @@ int main(void)
 		
 		resetTime++;
 		if (resetTime > 15){
+			
 			state = Score;
 			continue;
 		}
